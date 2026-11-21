@@ -221,3 +221,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated training data (recreate with: python src/generate_data.py)
+data/generated_*.csv
