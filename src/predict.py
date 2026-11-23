@@ -5,9 +5,8 @@ Used by the Budget Planner page of the app.
 
 import numpy as np
 import pandas as pd
-import torch
 
-from .baselines import BASELINES
+from .baselines import moving_average
 from .data import CATEGORIES, HISTORY_FEATURES, Windows
 
 
@@ -27,15 +26,14 @@ def person_window(monthly_person: pd.DataFrame, history: int) -> Windows:
     )
 
 
-def forecast(model, monthly_person: pd.DataFrame, history: int) -> pd.DataFrame:
+def forecast(predictor, monthly_person: pd.DataFrame) -> pd.DataFrame:
     """
-    Returns a table: Category, Neural network, 3-month average, and the forecast month
-    in the attribute .attrs['month'].
+    Returns a table: Category, Predicted (from `predictor`), Recent average (last 3 months).
+    The forecast month is in .attrs['month'].
     """
-    w = person_window(monthly_person, history)
-    nn_pred = model.predict(torch.from_numpy(w.history), torch.from_numpy(w.month)).numpy()[0]
-    avg = BASELINES["3-month average"](w)[0]
-    out = pd.DataFrame({"Category": CATEGORIES, "Neural network": nn_pred,
-                        "3-month average": avg})
+    w = person_window(monthly_person, max(predictor.history, 3))
+    out = pd.DataFrame({"Category": CATEGORIES,
+                        "Predicted": predictor.predict(w)[0],
+                        "Recent average": moving_average(w)[0]})
     out.attrs["month"] = w.meta["target_month"].iloc[0]
     return out

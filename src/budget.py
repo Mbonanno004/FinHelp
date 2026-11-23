@@ -63,10 +63,13 @@ def make_budget(predicted: dict, income: float, goal: float, max_cut: float = 0.
 
     if slack >= goal:
         savings, leftover = goal, slack - goal
-        messages.append(f"Your predicted spending already leaves room for the ${goal:,.0f} goal.")
-        if leftover > 0:
-            messages.append(f"About ${leftover:,.0f} is left over. Consider saving it or "
-                            "keeping it as a buffer.")
+        if goal > 0:
+            messages.append(f"Your predicted spending already leaves room for the ${goal:,.0f} goal.")
+            if leftover > 0:
+                messages.append(f"About ${leftover:,.0f} is left over. Consider saving it or "
+                                "keeping it as a buffer.")
+        else:
+            messages.append(f"Income covers the predicted spending with ${leftover:,.0f} left over.")
     else:
         need = goal - slack        # money to free up (includes any predicted deficit)
         capacity = {c: pred[c] * max_cut * FLEXIBILITY.get(c, 0.0)
@@ -80,7 +83,13 @@ def make_budget(predicted: dict, income: float, goal: float, max_cut: float = 0.
         total_rec = sum(recommended.values())
         savings = max(0.0, income - total_rec)
         leftover = 0.0
-        if share < 1.0:
+        if goal <= 0:      # no goal, but spending is predicted to exceed income
+            messages.append(f"Predicted spending is ${-slack:,.0f} more than income, so flexible "
+                            f"categories were trimmed by ${cut:,.0f} to try to break even.")
+            if income < total_rec - 0.5:
+                messages.append(f"Even after those cuts, spending is still ${total_rec - income:,.0f} "
+                                "more than income. Fixed costs may need attention.")
+        elif share < 1.0:
             messages.append(f"Cutting ${cut:,.0f} from flexible categories reaches the "
                             f"${goal:,.0f} goal.")
         else:
@@ -108,6 +117,7 @@ def make_budget(predicted: dict, income: float, goal: float, max_cut: float = 0.
         messages.append(f"At ${savings:,.0f}/month you would reach ${target_amount:,.0f} "
                         f"in about {months:.1f} months.")
 
+    balanced = income >= table["Recommended"].sum() - 0.5
     return Budget(table=table, income=income, goal=goal, savings=savings,
-                  leftover=leftover, goal_met=savings >= goal - 0.5,
+                  leftover=leftover, goal_met=savings >= goal - 0.5 and balanced,
                   messages=messages, months_to_target=months)

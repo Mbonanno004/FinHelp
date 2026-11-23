@@ -9,6 +9,7 @@ Step 4  split_people()        train / validation / test split BY PERSON, so the 
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -153,7 +154,10 @@ def make_windows(monthly: pd.DataFrame, history: int = 6) -> Windows:
 # Step 4: split by person
 # --------------------------------------------------------------------------------------
 
-def split_people(sample_ids, val_frac=0.15, test_frac=0.15, seed=0):
+SPLIT_SEED = 0   # fixed, so every model (yours and your teammates') uses the SAME test people
+
+
+def split_people(sample_ids, val_frac=0.15, test_frac=0.15, seed=SPLIT_SEED):
     """Randomly assign each person to train / val / test. Returns three sets of ids."""
     ids = np.array(sorted(set(sample_ids)))
     rng = np.random.default_rng(seed)
@@ -164,21 +168,28 @@ def split_people(sample_ids, val_frac=0.15, test_frac=0.15, seed=0):
     return set(train.tolist()), set(val.tolist()), set(test.tolist())
 
 
-def load_splits(generated_path="data/generated_transactions.csv",
-                original_path="data/synthetic_transactions.csv",
-                history=6, seed=0):
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_splits(generated_path=_ROOT / "data" / "generated_transactions.csv",
+                original_path=_ROOT / "data" / "synthetic_transactions.csv",
+                history=6):
     """
     Convenience loader used by training and evaluation.
     Returns dict with Windows for 'train', 'val', 'test' (held-out generated people)
-    and 'original' (the 10 people from the hand-made dataset).
+    and 'original' (the 10 people from the hand-made dataset; None if `history` is
+    too long for its 12 months).
     """
     gen = make_windows(to_monthly(load_transactions(generated_path)), history)
-    train_ids, val_ids, test_ids = split_people(gen.meta["sample_id"], seed=seed)
+    train_ids, val_ids, test_ids = split_people(gen.meta["sample_id"])
     ids = gen.meta["sample_id"]
     splits = {
         "train": gen.subset(ids.isin(train_ids)),
         "val": gen.subset(ids.isin(val_ids)),
         "test": gen.subset(ids.isin(test_ids)),
     }
-    splits["original"] = make_windows(to_monthly(load_transactions(original_path)), history)
+    try:
+        splits["original"] = make_windows(to_monthly(load_transactions(original_path)), history)
+    except ValueError:
+        splits["original"] = None
     return splits

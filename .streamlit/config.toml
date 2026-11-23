@@ -1,0 +1,10 @@
+# App-wide Streamlit settings (read automatically by `streamlit run app.py`).
+
+# Table headers (column names) get a darker gray so they stand out from the data rows.
+[theme.light]
+dataframeHeaderBackgroundColor = "#d3d6db"
+dataframeHeaderTextColor = "#262730"
+
+[theme.dark]
+dataframeHeaderBackgroundColor = "#3b3f4a"
+dataframeHeaderTextColor = "#fafafa"

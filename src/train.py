@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from .data import CATEGORIES, HISTORY_FEATURES, Windows, load_splits
 from .model import SpendingModel
 
-DEFAULT_MODEL_PATH = Path("models/spending_model.pt")
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "spending_model.pt"
 
 
 @dataclass
@@ -36,7 +36,7 @@ class TrainConfig:
     epochs: int = 200
     patience: int = 10        # stop early if validation hasn't improved for this many epochs
     loss: str = "l1"          # "l1" (mean absolute error), "mse" or "huber"
-    seed: int = 0
+    seed: int = 0             # random starting weights / shuffling (the test people never change)
 
 
 def to_tensors(w: Windows):
@@ -62,7 +62,7 @@ def train(config: TrainConfig, splits=None, on_epoch=None, verbose=True):
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     if splits is None:
-        splits = load_splits(history=config.history, seed=config.seed)
+        splits = load_splits(history=config.history)
 
     model = SpendingModel(config.history, len(HISTORY_FEATURES), len(CATEGORIES),
                           config.hidden, config.layers, config.dropout)
@@ -149,14 +149,15 @@ def main():
     out = args.pop("out")
     config = TrainConfig(**args)
 
-    splits = load_splits(history=config.history, seed=config.seed)
+    splits = load_splits(history=config.history)
     model, history = train(config, splits)
     save_model(model, config, history, out)
     print(f"\nBest validation MAE ${history['best_val_mae']:.2f} "
           f"({history['seconds']:.1f}s). Saved to {out}\n")
 
     from .evaluate import report
-    report(splits, model)
+    from .zoo import baseline_predictors, nn_predictor_from
+    report(splits, [nn_predictor_from(model, config)] + baseline_predictors())
 
 
 if __name__ == "__main__":
