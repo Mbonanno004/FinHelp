@@ -8,6 +8,8 @@ export type Meta = {
 	categories: string[];
 	fixed_categories: string[];
 	flexibility: Record<string, number>;
+	guideline_share: Record<string, number>;
+	groups: { name: string; categories: string[]; share_max: number }[];
 	train_defaults: TrainConfig;
 	generated_available: boolean;
 };
@@ -29,10 +31,20 @@ export type Forecast = {
 	predicted_total: number;
 	recent_average_total: number;
 	recent_income: number;
+	typical: Record<string, number>;
 };
 
 export type Budget = {
-	table: { category: string; type: string; predicted: number; recommended: number; change: number }[];
+	table: {
+		category: string;
+		type: string;
+		predicted: number;
+		max: number;
+		recommended: number;
+		change: number;
+		status: 'OK' | 'Over max' | 'Capped at max' | 'Cut to save';
+	}[];
+	groups: BudgetGroup[];
 	income: number;
 	goal: number;
 	savings: number;
@@ -64,3 +76,14 @@ export type Comparison = {
 export type CategoryErrors = { category: string; avg_actual: number; errors: Record<string, number> };
 
 export type Dataset = { key: string; label: string; people: number[] };
+
+export type BudgetGroup = {
+	name: string;
+	categories: string[];
+	predicted: number;
+	recommended: number;
+	max: number;
+	share_max: number;
+	share_recommended: number | null;
+	over: boolean;
+};

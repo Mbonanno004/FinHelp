@@ -8,7 +8,6 @@
 	import Section from '#lib/components/Section.svelte';
 	import Metric from '#lib/components/Metric.svelte';
 	import Chart from '#lib/components/Chart.svelte';
-	import Toggle from '#lib/components/Toggle.svelte';
 	import PersonPicker from '#lib/components/PersonPicker.svelte';
 	import AccuracyExplanation from '#lib/components/AccuracyExplanation.svelte';
 
@@ -102,17 +101,34 @@
 		}, 250);
 	});
 
+	// ---- Savings target in dollars, from whichever savings mode is chosen ----
+	const savingsTarget = $derived(
+		planner.savingsMode === 'percent'
+			? Math.round(((planner.income ?? 0) * planner.savingsRate) / 100)
+			: planner.savingsMode === 'specific'
+				? (planner.goal ?? 0)
+				: 0
+	);
+	const goalOn = $derived(savingsTarget > 0);
+	const budgetTitle = $derived(
+		planner.savingsMode === 'percent'
+			? `Recommended budget: saving ${planner.savingsRate}% of income`
+			: planner.savingsMode === 'specific' && planner.goalName
+				? `Recommended budget: ${planner.goalName}`
+				: 'Recommended budget'
+	);
+
 	// ---- Budget whenever the prediction or goal settings change ----
 	let budgetTimer: ReturnType<typeof setTimeout>;
 	$effect(() => {
-		const goalOn = planner.hasGoal && !!planner.goal;
 		const body = forecast && {
 			predicted: Object.fromEntries(forecast.categories.map((c) => [c.category, c.predicted])),
+			typical: forecast.typical,
 			income: planner.income ?? 0,
-			goal: goalOn ? planner.goal : 0,
-			max_cut: goalOn ? planner.maxCut / 100 : 0.3,
-			protected: goalOn ? [...planner.protected] : [],
-			target: goalOn ? planner.target : null
+			goal: savingsTarget,
+			max_cut: planner.maxCut / 100,
+			protected: [...planner.protected],
+			target: planner.savingsMode === 'specific' ? planner.target : null
 		};
 		clearTimeout(budgetTimer);
 		if (!body) {
@@ -167,7 +183,6 @@
 	// ---- Derived display values ----
 	const modelSummary = $derived(accuracy?.summary.find((s) => s.model === planner.model));
 	const avgSummary = $derived(accuracy?.summary.find((s) => s.model === SIMPLE_AVG));
-	const goalOn = $derived(planner.hasGoal && !!planner.goal);
 
 	const budgetChart: ChartConfiguration | null = $derived(
 		budget && {
@@ -176,7 +191,8 @@
 				labels: budget.table.map((r) => r.category),
 				datasets: [
 					{ label: 'Predicted', data: budget.table.map((r) => r.predicted), backgroundColor: '#a5b4fc', borderRadius: 4 },
-					{ label: 'Recommended', data: budget.table.map((r) => r.recommended), backgroundColor: '#3b5bdb', borderRadius: 4 }
+					{ label: 'Recommended', data: budget.table.map((r) => r.recommended), backgroundColor: '#3b5bdb', borderRadius: 4 },
+					{ label: 'Max logical spend', data: budget.table.map((r) => r.max), backgroundColor: '#dee2e6', borderRadius: 4 }
 				]
 			},
 			options: {
@@ -382,20 +398,35 @@
 			</div>
 		</Section>
 
-		<!-- ================= Income and goal ================= -->
+		<!-- ================= Income and savings ================= -->
 		<Section
-			title="Income and savings goal"
-			purpose="Set next month’s expected income. Turn on a savings goal if you’re saving for something."
+			title="Income and savings"
+			purpose="Set next month’s expected income and choose how much you want to save. The budget below adapts to your choice."
 		>
-			<div class="income-row">
-				<label class="field income">
+			<div class="grid cols-2">
+				<label class="field">
 					Expected income next month ($)
 					<input type="number" min="0" step="50" bind:value={planner.income} title="Starts at this person’s average income over the last 3 months." />
 				</label>
-				<Toggle bind:checked={planner.hasGoal} label="I have a savings goal" />
+				<div class="field">
+					Savings
+					<div class="segmented">
+						<button class:on={planner.savingsMode === 'none'} onclick={() => (planner.savingsMode = 'none')}>No savings goal</button>
+						<button class:on={planner.savingsMode === 'percent'} onclick={() => (planner.savingsMode = 'percent')}>Save a % of income</button>
+						<button class:on={planner.savingsMode === 'specific'} onclick={() => (planner.savingsMode = 'specific')}>Save for something</button>
+					</div>
+				</div>
 			</div>
 
-			{#if planner.hasGoal}
+			{#if planner.savingsMode === 'percent'}
+				<div class="card goal-box">
+					<label class="field">
+						<span>Save <strong class="cut">{planner.savingsRate}%</strong> of income = <strong class="cut">{money(savingsTarget)}</strong> per month</span>
+						<input type="range" min="5" max="50" step="1" bind:value={planner.savingsRate} />
+						<span class="hint">20% is the common “50/30/20” guideline: about 50% of income for needs, 30% for wants and 20% for savings.</span>
+					</label>
+				</div>
+			{:else if planner.savingsMode === 'specific'}
 				<div class="card goal-box">
 					<div class="grid cols-3">
 						<label class="field">
@@ -411,39 +442,43 @@
 							<input type="number" min="0" step="500" placeholder="e.g. 6000" bind:value={planner.target} title="Used to estimate how many months reaching the goal takes." />
 						</label>
 					</div>
-					<div class="grid cols-2" style="margin-top: 1rem">
-						<label class="field">
-							Largest cut allowed per category: <strong class="cut">{planner.maxCut}%</strong>
-							<input type="range" min="0" max="60" step="5" bind:value={planner.maxCut} title="No flexible category is reduced by more than this." />
-						</label>
-						<div class="field">
-							Don’t cut these
-							<div class="chips">
-								{#each flexible as c}
-									<button class="chip" class:on={planner.protected.includes(c)} onclick={() => toggleProtected(c)}>{c}</button>
-								{/each}
-							</div>
-						</div>
-					</div>
 				</div>
 				{#if !planner.goal}
 					<div class="callout info">Enter how much you’d like to save per month, and the budget below will be built around it.</div>
 				{/if}
 			{/if}
+
+			<details class="collapse">
+				<summary>Budget options (cut limit, categories not to cut)</summary>
+				<div class="content grid cols-2">
+					<label class="field">
+						<span>Largest cut allowed per category: <strong class="cut">{planner.maxCut}%</strong></span>
+						<input type="range" min="0" max="60" step="5" bind:value={planner.maxCut} />
+						<span class="hint">No flexible category is reduced by more than this to reach a savings target.</span>
+					</label>
+					<div class="field">
+						Don’t cut these
+						<div class="chips">
+							{#each flexible as c}
+								<button class="chip" class:on={planner.protected.includes(c)} onclick={() => toggleProtected(c)}>{c}</button>
+							{/each}
+						</div>
+						<span class="hint">Protected categories are never trimmed or capped.</span>
+					</div>
+				</div>
+			</details>
 		</Section>
 
 		<!-- ================= Budget ================= -->
 		{#if budget}
 			<Section
-				title={'Recommended budget' + (goalOn && planner.goalName ? `: ${planner.goalName}` : '')}
-				purpose={goalOn
-					? 'Fixed costs stay as predicted. If the goal doesn’t fit, flexible categories are trimmed.'
-					: 'Without a savings goal the budget follows the prediction (trimmed only if spending would exceed income).'}
+				title={budgetTitle}
+				purpose="For every category: what the model predicts, the max it’s logical to spend for this income, and what we recommend budgeting."
 			>
 				<div class="grid {goalOn ? 'cols-4' : 'cols-3'}">
 					<Metric label="Income" value={money(budget.income)} />
 					<Metric
-						label="Spending budget"
+						label="Recommended spending"
 						value={money(budget.spending_total)}
 						delta={Math.abs(budget.change_total) >= 0.5 ? `${money(budget.change_total)} vs. predicted` : ''}
 						tone="good"
@@ -452,33 +487,57 @@
 						<Metric
 							label="Savings"
 							value={money(budget.savings)}
-							delta={budget.goal_met ? 'goal met' : `${money(budget.savings - budget.goal)} short of goal`}
+							delta={budget.goal_met ? 'target met' : `${money(budget.savings - budget.goal)} short of target`}
 							tone={budget.goal_met ? 'good' : 'bad'}
 						/>
 					{/if}
 					<Metric label="Left over" value={money(budget.leftover)} />
 				</div>
 				{#each budget.messages as msg}
-					<div class="callout {budget.goal_met ? 'success' : 'warning'}">{msg}</div>
+					<div class="callout {msg.includes('above its max') || !budget.goal_met ? 'warning' : 'success'}">{msg}</div>
 				{/each}
 
+				<h3 class="sub">Bills and spending groups</h3>
+				<div class="grid cols-groups">
+					{#each budget.groups as g}
+						{@const pctOfIncome = budget.income > 0 ? (g.recommended / budget.income) * 100 : 0}
+						{@const fill = g.max > 0 ? Math.min(100, (g.recommended / g.max) * 100) : 100}
+						<div class="card group" class:over={g.over} class:total={g.name === 'All bills'}>
+							<div class="group-head">
+								<span class="group-name">{g.name}</span>
+								{#if g.over}<span class="badge bad">Over max</span>{:else}<span class="badge good">Within max</span>{/if}
+							</div>
+							<div class="group-value">{money(g.recommended)}</div>
+							<div class="meter"><div class="meter-fill" style="width: {fill}%"></div></div>
+							<div class="group-meta">
+								<span>Max {money(g.max)} ({Math.round(g.share_max * 100)}% of income)</span>
+								<span>{pctOfIncome.toFixed(0)}% of income</span>
+							</div>
+							<div class="group-cats">{g.categories.join(' · ')}</div>
+						</div>
+					{/each}
+				</div>
+
+				<h3 class="sub">By category</h3>
 				<div class="budget-grid">
 					<div class="card">
-						{#if budgetChart}<Chart config={budgetChart} height={420} />{/if}
+						{#if budgetChart}<Chart config={budgetChart} height={460} />{/if}
 					</div>
 					<div class="table-wrap">
 						<table>
 							<thead>
-								<tr><th>Category</th><th>Type</th><th class="num">Predicted</th><th class="num">Recommended</th><th class="num">Change</th></tr>
+								<tr><th>Category</th><th class="num">Predicted</th><th class="num">Max</th><th class="num">Recommended</th><th>Status</th></tr>
 							</thead>
 							<tbody>
 								{#each budget.table as r}
 									<tr>
-										<td class="label">{r.category}</td>
-										<td class="muted">{r.type}</td>
+										<td class="label">{r.category}<div class="muted tiny">{r.type}</div></td>
 										<td class="num">{money(r.predicted)}</td>
+										<td class="num muted">{money(r.max)}</td>
 										<td class="num"><strong>{money(r.recommended)}</strong></td>
-										<td class="num" class:neg={r.change < -0.5}>{signed(r.change)}</td>
+										<td>
+											<span class="badge {r.status === 'Over max' ? 'bad' : r.status === 'OK' ? 'neutral' : 'info'}">{r.status}</span>
+										</td>
 									</tr>
 								{/each}
 							</tbody>
@@ -487,17 +546,35 @@
 				</div>
 
 				<details class="collapse">
-					<summary>How is the budget calculated?</summary>
+					<summary>How are the max and recommended amounts calculated?</summary>
 					<div class="content">
+						<h3>Max logical spend</h3>
+						<p>
+							Each category’s max is a share of income based on common budgeting rules: the “30% rule” for
+							housing and the 50/30/20 budget (about 50% needs, 30% wants, 20% savings):
+						</p>
+						<div class="chips" style="margin-bottom: 0.75rem">
+							{#each Object.entries(app.meta?.guideline_share ?? {}) as [c, v]}
+								<span class="chip static">{c} ≤ {Math.round(v * 100)}%</span>
+							{/each}
+						</div>
+						<p>
+							For flexible categories the max never drops below the least this person can realistically get by
+							on: their typical month (median of the last 6 months) minus the largest allowed cut. That way
+							the max fits the person’s real life, not just a rule of thumb. Group maxes: rent / housing ≤ 30%,
+							other consistent bills ≤ 20%, all bills ≤ 50%, everyday needs ≤ 25%, wants ≤ 30% of income.
+						</p>
+						<h3>Recommended spend</h3>
 						<ol>
-							<li>The model’s prediction is the starting point.</li>
-							<li><strong>Fixed</strong> costs (housing, utilities, bills, family) stay as predicted.</li>
-							<li>If income − predicted spending already covers the goal (or there is no goal and income covers spending), nothing changes.</li>
+							<li>Start from the model’s prediction.</li>
+							<li><strong>Fixed bills</strong> (housing, utilities, bills, family) stay as predicted. If one is above its max it’s flagged, because it can’t be cut within a month.</li>
+							<li><strong>Flexible</strong> categories above their max are trimmed down to it.</li>
 							<li>
-								Otherwise <strong>flexible</strong> categories are cut. Each can shrink by at most the cut limit × how flexible it is:
+								If there’s still not enough left for the savings target, flexible categories are cut further.
+								Each can shrink by at most the cut limit × how flexible it is:
 								{Object.entries(app.meta?.flexibility ?? {}).map(([c, v]) => `${c} ${Math.round(v * 100)}%`).join(', ')}.
+								The cuts are shared in proportion to how much each category can give.
 							</li>
-							<li>The cuts are shared in proportion to how much each category can give.</li>
 							<li>If that still isn’t enough, the app reports what <em>can</em> be saved.</li>
 						</ol>
 					</div>
@@ -598,17 +675,131 @@
 	.upload-help {
 		margin-top: 1rem;
 	}
-	.income-row {
+	.segmented {
 		display: flex;
-		align-items: flex-end;
-		gap: 2rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 8px;
+		overflow: hidden;
+		background: var(--surface);
+	}
+	.segmented button {
+		flex: 1;
+		font: inherit;
+		font-size: 0.88rem;
+		font-weight: 500;
+		padding: 0.55rem 0.5rem;
+		border: none;
+		border-left: 1px solid var(--border);
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.segmented button:first-child {
+		border-left: none;
+	}
+	.segmented button.on {
+		background: var(--primary);
+		color: #fff;
+	}
+	.hint {
+		font-weight: 400;
+		color: var(--faint);
+		font-size: 0.8rem;
+	}
+	.sub {
+		margin: 1.5rem 0 0.75rem;
+	}
+	.cols-groups {
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+	}
+	@media (max-width: 1000px) {
+		.cols-groups {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+	.group {
+		padding: 0.9rem 1rem;
+	}
+	.group.total {
+		border-color: var(--primary);
+		background: var(--primary-soft);
+	}
+	.group.over {
+		border-color: #ffc9c9;
+	}
+	.group-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.group-name {
+		font-weight: 600;
+		font-size: 0.88rem;
+	}
+	.group-value {
+		font-size: 1.45rem;
+		font-weight: 650;
+		margin: 0.25rem 0 0.4rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.meter {
+		height: 6px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		overflow: hidden;
+	}
+	.meter-fill {
+		height: 100%;
+		background: var(--primary);
+	}
+	.group.over .meter-fill {
+		background: var(--danger);
+	}
+	.group-meta {
+		display: flex;
+		justify-content: space-between;
 		flex-wrap: wrap;
+		gap: 0.25rem;
+		font-size: 0.75rem;
+		color: var(--muted);
+		margin-top: 0.4rem;
 	}
-	.income {
-		width: 280px;
+	.group-cats {
+		font-size: 0.72rem;
+		color: var(--faint);
+		margin-top: 0.3rem;
 	}
-	.income-row :global(.toggle) {
-		margin-bottom: 0.55rem;
+	.badge {
+		font-size: 0.72rem;
+		font-weight: 600;
+		border-radius: 999px;
+		padding: 0.1rem 0.5rem;
+		white-space: nowrap;
+	}
+	.badge.good {
+		background: var(--success-soft);
+		color: var(--success);
+	}
+	.badge.bad {
+		background: var(--danger-soft);
+		color: var(--danger);
+	}
+	.badge.info {
+		background: var(--primary-soft);
+		color: var(--primary);
+	}
+	.badge.neutral {
+		background: var(--surface-2);
+		color: var(--muted);
+	}
+	.tiny {
+		font-size: 0.72rem;
+		font-weight: 400;
+	}
+	.chip.static {
+		cursor: default;
 	}
 	.goal-box {
 		margin-top: 1rem;

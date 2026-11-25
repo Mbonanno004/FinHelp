@@ -28,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from src.budget import FLEXIBILITY, make_budget
+from src.budget import FLEXIBILITY, GROUPS, GUIDELINE_SHARE, make_budget
 from src.data import (CATEGORIES, FIXED_CATEGORIES, load_splits, load_transactions,
                       split_people, to_monthly)
 from src.evaluate import backtest, category_errors, compare
@@ -192,6 +192,8 @@ def meta():
         "categories": CATEGORIES,
         "fixed_categories": FIXED_CATEGORIES,
         "flexibility": FLEXIBILITY,
+        "guideline_share": GUIDELINE_SHARE,
+        "groups": [{"name": n, "categories": c, "share_max": s} for n, c, s in GROUPS],
         "train_defaults": asdict(TrainConfig()),
         "generated_available": GENERATED.exists(),
     }
@@ -273,6 +275,8 @@ def forecast_endpoint(req: ForecastRequest):
         "predicted_total": float(fc["Predicted"].sum()),
         "recent_average_total": float(fc["Recent average"].sum()),
         "recent_income": float(recent["Income"].mean()),
+        # Typical month per category (median of the last 6 months): used for max logical spend
+        "typical": {c: float(v) for c, v in monthly.tail(6)[CATEGORIES].median().items()},
     }
 
 
@@ -283,16 +287,19 @@ class BudgetRequest(BaseModel):
     max_cut: float = Field(0.30, ge=0, le=1)
     protected: list[str] = []
     target: Optional[float] = None
+    typical: Optional[dict[str, float]] = None
 
 
 @app.post("/api/budget")
 def budget_endpoint(req: BudgetRequest):
     b = make_budget(req.predicted, req.income, req.goal, req.max_cut, req.protected,
-                    req.target or None)
+                    req.target or None, req.typical)
     return {
         "table": [{"category": r["Category"], "type": r["Type"], "predicted": float(r["Predicted"]),
-                   "recommended": float(r["Recommended"]), "change": float(r["Change"])}
+                   "max": float(r["Max"]), "recommended": float(r["Recommended"]),
+                   "change": float(r["Change"]), "status": r["Status"]}
                   for _, r in b.table.iterrows()],
+        "groups": b.groups,
         "income": b.income, "goal": b.goal, "savings": b.savings, "leftover": b.leftover,
         "goal_met": bool(b.goal_met), "messages": b.messages,
         "months_to_target": b.months_to_target,

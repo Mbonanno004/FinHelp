@@ -18,6 +18,7 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		// During development, forward every /api request to the Python API.
-		proxy: { '/api': 'http://127.0.0.1:8000' }
+		// Set FINHELP_API to use an API on a different address/port.
+		proxy: { '/api': process.env.FINHELP_API ?? 'http://127.0.0.1:8000' }
 	}
 });

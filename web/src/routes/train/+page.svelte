@@ -137,34 +137,34 @@
 			<div class="card">
 				<div class="grid cols-4">
 					<label class="field">
-						Months of history: <strong>{config.history}</strong>
+						<span>Months of history: <strong>{config.history}</strong></span>
 						<input type="range" min="3" max="9" bind:value={config.history} />
 						<span class="hint">How many past months the model looks at to predict the next one.</span>
 					</label>
 					<label class="field">
-						Neurons per layer: <strong>{config.hidden}</strong>
+						<span>Neurons per layer: <strong>{config.hidden}</strong></span>
 						<input type="range" min="0" max={HIDDEN.length - 1} value={HIDDEN.indexOf(config.hidden)}
 							oninput={(e) => (config!.hidden = HIDDEN[+(e.target as HTMLInputElement).value])} />
 						<span class="hint">How much “brain power” each layer has. More can learn more, but may memorize.</span>
 					</label>
 					<label class="field">
-						Hidden layers: <strong>{config.layers}</strong>
+						<span>Hidden layers: <strong>{config.layers}</strong></span>
 						<input type="range" min="1" max="4" bind:value={config.layers} />
 						<span class="hint">How many layers of pattern-finding are stacked on top of each other.</span>
 					</label>
 					<label class="field">
-						Dropout: <strong>{config.dropout.toFixed(2)}</strong>
+						<span>Dropout: <strong>{config.dropout.toFixed(2)}</strong></span>
 						<input type="range" min="0" max="0.5" step="0.05" bind:value={config.dropout} />
 						<span class="hint">Share of neurons switched off while practicing, so it can’t just memorize.</span>
 					</label>
 					<label class="field">
-						Learning rate: <strong>{config.lr}</strong>
+						<span>Learning rate: <strong>{config.lr}</strong></span>
 						<input type="range" min="0" max={LRS.length - 1} value={LRS.indexOf(config.lr)}
 							oninput={(e) => (config!.lr = LRS[+(e.target as HTMLInputElement).value])} />
 						<span class="hint">Step size for each correction. Too big overshoots; too small is slow.</span>
 					</label>
 					<label class="field">
-						Max epochs: <strong>{config.epochs}</strong>
+						<span>Max epochs: <strong>{config.epochs}</strong></span>
 						<input type="range" min="10" max="400" step="10" bind:value={config.epochs} />
 						<span class="hint">Maximum passes through the training data. Stops early if it stops improving.</span>
 					</label>

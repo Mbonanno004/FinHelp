@@ -30,7 +30,9 @@ export const planner = $state({
 	uploadPeople: [] as { sample_id: number; rows: MonthRow[] }[],
 	uploadId: null as number | null,
 	income: null as number | null,
-	hasGoal: false,
+	// 'none' = no savings target, 'percent' = save a share of income, 'specific' = save for something
+	savingsMode: 'none' as 'none' | 'percent' | 'specific',
+	savingsRate: 20,
 	goalName: '',
 	goal: null as number | null,
 	target: null as number | null,

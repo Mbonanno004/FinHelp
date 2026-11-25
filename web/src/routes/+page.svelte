@@ -84,8 +84,8 @@
 		<ol class="quick">
 			<li>Open <strong>Budget Planner</strong>. An example person is already loaded (open their table to see or edit it).</li>
 			<li>Read <strong>Next month’s prediction</strong>: the total and the prediction for each category.</li>
-			<li>Under <strong>Income and savings goal</strong>, check the income. If you’re saving for something, turn on <strong>I have a savings goal</strong> and enter it (e.g. $500/month for a car).</li>
-			<li>Read the <strong>Recommended budget</strong>: what to spend in each category and whether the goal is reachable.</li>
+			<li>Under <strong>Income and savings</strong>, check the income and choose <strong>No savings goal</strong>, <strong>Save a % of income</strong> (20% is a common guideline), or <strong>Save for something</strong> specific (e.g. $500/month for a car).</li>
+			<li>Read the <strong>Recommended budget</strong>: your bills (rent, other consistent bills, all bills) and spending groups, plus each category’s <strong>max logical spend</strong> and <strong>recommended spend</strong>.</li>
 			<li>Scroll to <strong>How accurate is the model for this person?</strong> to see how far the predictions can be trusted. Then try someone from the dataset.</li>
 			<li>Visit <strong>Compare Models</strong> to see how well each model does overall.</li>
 		</ol>

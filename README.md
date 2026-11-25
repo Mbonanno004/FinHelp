@@ -77,8 +77,8 @@ The app has four pages, listed in the bar across the top:
 
 1. Open **Budget Planner**. An example person ($3,000 income, about $2,300 spending) is already loaded. Open the collapsible table to see or edit their months.
 2. **Next month's prediction** shows what the model expects them to spend in total and in each category, compared with their recent average.
-3. **Income and savings goal:** check the expected income. To save for something, turn on **I have a savings goal** and enter what it's for, how much to save per month, and optionally the total needed, a cut limit, and categories not to cut.
-4. **Recommended budget** shows what to spend per category, how much gets saved, and whether the goal is met.
+3. **Income and savings:** check the expected income, then choose **No savings goal**, **Save a % of income** (a slider, 20% by default), or **Save for something** (what it's for, how much per month, and optionally the total needed). *Budget options* sets the cut limit and categories not to cut.
+4. **Recommended budget** shows summary cards for **Rent / housing**, **Other consistent bills**, **All bills**, **Everyday needs** and **Wants**, each against its maximum. Below them, every category lists its **predicted**, **max logical** and **recommended** spend, how much gets saved, and whether the target is met.
 5. **How accurate is the model for this person?** (at the bottom) replays their past months and reports the model's accuracy next to a simple 3-month average. Use this to decide how much to trust the prediction.
 6. Choose *Pick someone from the dataset* to try other people, or open **Compare Models** to see overall results.
 
@@ -133,11 +133,21 @@ It then appears automatically on **Compare Models**, in the Budget Planner's mod
 
 ## How the budget is built
 
-The model predicts what you **will** spend; `src/budget.py` decides what you **should** spend:
+The model predicts what you **will** spend; `src/budget.py` decides what you **should** spend. Each category gets three numbers:
 
-1. Fixed costs (Housing, Utilities, Bills, Family) stay at their predicted amount.
-2. If income minus predicted spending covers the savings goal, the budget is the prediction, and any extra is reported as leftover.
-3. Otherwise, flexible categories are cut. Each can be cut by at most *cut limit × flexibility*: Dining, Entertainment and Shopping 100%, Other 60%, Transportation 40%, Groceries 30%, Healthcare 0%. The cuts are shared in proportion to how much each category can give.
+| Number | Meaning |
+|---|---|
+| **Predicted** | What the neural network expects next month |
+| **Max logical spend** | A guideline share of income, based on the "30% rule" for housing and the 50/30/20 budget: Housing 30%, Utilities 8%, Bills 10%, Family 12%, Groceries 12%, Transportation 12%, Healthcare 6%, Dining 8%, Shopping 8%, Entertainment 5%, Other 8%. For flexible categories the max never drops below the person's typical month (median of the last 6 months) minus the largest allowed cut, so it fits their real life. |
+| **Recommended** | What to budget (see below) |
+
+Groups are summarized with their own maximums: **Rent / housing** ≤ 30% of income, **Other consistent bills** (utilities, insurance/subscriptions/debt, childcare) ≤ 20%, **All bills** ≤ 50%, **Everyday needs** (groceries, transportation, healthcare) ≤ 25%, **Wants** (dining, shopping, entertainment, other) ≤ 30%.
+
+The savings target is $0 with no goal, *rate × income* when saving a percent of income, or the typed amount when saving for something specific. Then:
+
+1. Fixed bills (Housing, Utilities, Bills, Family) stay at their predicted amount. Any above its max is flagged, since it can't be cut within a month.
+2. Flexible categories above their max are trimmed down to it.
+3. If income minus spending still doesn't cover the savings target, flexible categories are cut further. Each can be cut by at most *cut limit × flexibility*: Dining, Entertainment and Shopping 100%, Other 60%, Transportation 40%, Groceries 30%, Healthcare 0%. The cuts are shared in proportion to how much each category can give.
 4. If the maximum cuts still aren't enough, the app reports the savings that are achievable and suggests options.
 
 ## Training and evaluating
