@@ -1,26 +1,70 @@
 # FinHelp
 A simple artificial intelligence program to help predict and budget future expenses.
 
-## Setup (Windows, PowerShell)
+FinHelp has two parts that work together:
 
-Requires Python 3.12 or newer (tested on 3.14).
+- **`api/` + `src/` (Python):** the machine learning. This covers data processing, the PyTorch model, training, evaluation and the budget algorithm, exposed as a small **FastAPI** web server.
+- **`web/` (SvelteKit):** the website you use. It runs in the browser and gets every prediction, budget and accuracy number from the Python API.
+
+```
+Browser ──► SvelteKit website (web/) ──/api/...──► FastAPI server (api/main.py) ──► src/ (PyTorch model, budget, evaluation)
+```
+
+## Setup (one time)
+
+Requires **Python 3.12+** (tested on 3.14) and **Node.js 20+** (tested on 24). Run these from the project folder in PowerShell:
 
 ```
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python src/generate_data.py        # creates data/generated_transactions.csv
+python src/generate_data.py            # creates data/generated_transactions.csv (~3 s)
+npm --prefix web install               # installs the website's packages
 ```
 
 On macOS/Linux, activate with `source .venv/bin/activate` instead.
+If PowerShell refuses to run `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+
+## Running the app
+
+### Option A: one command (recommended)
+
+```
+.\start.ps1
+```
+
+This opens the Python API in its own window (http://localhost:8000) and starts the website at **http://localhost:5173**, opening it in your browser. Close both windows (or press Ctrl+C) to stop.
+If PowerShell blocks the script, use `powershell -ExecutionPolicy Bypass -File start.ps1`.
+
+### Option B: two terminals (any OS)
+
+```
+# Terminal 1: the Python API (with the .venv activated)
+python -m uvicorn api.main:app --port 8000
+
+# Terminal 2: the website
+npm --prefix web run dev
+```
+
+Then open **http://localhost:5173**. The website forwards every `/api/...` request to the Python server.
+
+### Option C: final build for a demo (a single server)
+
+```
+npm --prefix web run build                 # builds the website into web/build
+python -m uvicorn api.main:app --port 8000
+```
+
+Then open **http://localhost:8000**. The Python server now serves the website as well, so nothing else needs to run. Rebuild after changing anything in `web/`.
+
+**Tips**
+- Interactive documentation for every API endpoint is at http://localhost:8000/docs.
+- Changed Python code in `api/` or `src/`? Restart the API. New or edited custom models in `src/custom_models/` are picked up automatically.
+- Changed code in `web/`? The website updates instantly in Options A and B.
 
 ## Using the app
 
-```
-streamlit run app.py
-```
-
-This opens http://localhost:8501 in your browser. The app has four pages, listed in the bar across the top:
+The app has four pages, listed in the bar across the top:
 
 | Page | What you can do |
 |---|---|
@@ -81,7 +125,11 @@ It then appears automatically on **Compare Models**, in the Budget Planner's mod
 | `models/linear_regression.npz` | Trained example comparison model |
 | `src/predict.py` | Forecast next month for one person (used by the app) |
 | `src/budget.py` | Rule-based budget algorithm: predictions + income + goal → recommended budget |
-| `app.py` | Streamlit app |
+| `api/main.py` | FastAPI server: exposes forecasting, budgets, accuracy checks, comparison and training to the website; serves the built website in Option C |
+| `web/src/routes/` | The four pages: `+page.svelte` (Start Here), `planner/`, `compare/`, `train/`, and `+layout.svelte` (top bar) |
+| `web/src/lib/` | Shared frontend code: `api.ts` (calls the Python API), `state.svelte.ts` (inputs kept between pages), `components/` (charts, metric cards, toggle…) |
+| `web/vite.config.ts` | SvelteKit config, including the `/api` forwarding to the Python server |
+| `start.ps1` | Starts the API and the website together (Option A) |
 
 ## How the budget is built
 

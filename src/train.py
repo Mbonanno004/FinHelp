@@ -6,7 +6,7 @@ Run from the project root:
     python -m src.train --epochs 100 --hidden 256 --lr 0.0005
 
 The best model (lowest validation error) is saved to models/spending_model.pt.
-The Streamlit app calls train() directly so it can draw the loss curve live.
+The web app (api/main.py) calls train() directly so it can stream the loss curve live.
 """
 
 import argparse
@@ -40,8 +40,8 @@ class TrainConfig:
 
 
 def to_tensors(w: Windows):
-    return (torch.from_numpy(w.history), torch.from_numpy(w.month),
-            torch.from_numpy(w.target))
+    return (torch.tensor(w.history), torch.tensor(w.month),
+            torch.tensor(w.target))
 
 
 def loss_fn(name: str):
